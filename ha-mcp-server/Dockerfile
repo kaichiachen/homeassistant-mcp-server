@@ -6,7 +6,7 @@ LABEL \
     io.hass.description="Model Context Protocol (MCP) server for Home Assistant." \
     io.hass.arch="aarch64|amd64" \
     io.hass.type="addon" \
-    io.hass.version="0.1.1"
+    io.hass.version="0.1.2"
 
 # Set working directory
 WORKDIR /app
