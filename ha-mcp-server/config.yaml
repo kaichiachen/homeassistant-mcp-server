@@ -16,4 +16,4 @@ schema:
   ha_token: str
 ports:
   8000/tcp: 8000
-image: "ghcr.io/kaichiachen/ha-mcp-server/ha-mcp-server-{arch}"
+image: "ghcr.io/kaichiachen/ha-mcp-server"
