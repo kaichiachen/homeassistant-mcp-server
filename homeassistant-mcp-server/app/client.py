@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from app.config import HA_URL, HA_TOKEN, get_ha_headers
+from app.domains import DOMAIN_IMPORTANT_ATTRIBUTES
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -23,9 +24,6 @@ DEFAULT_LEAN_FIELDS = ["entity_id", "state", "attr.friendly_name"]
 
 # Common fields that are typically needed for entity operations
 DEFAULT_STANDARD_FIELDS = ["entity_id", "state", "attributes", "last_updated"]
-
-# Domain-specific important attributes to include in lean responses
-from app.domains import DOMAIN_IMPORTANT_ATTRIBUTES
 
 def handle_api_errors(func: F) -> F:
     """
@@ -383,88 +381,74 @@ async def summarize_domain(domain: str, example_limit: int = 3) -> Dict[str, Any
         return {"error": f"Error generating domain summary: {str(e)}"}
 
 @handle_api_errors
-async def get_automations() -> List[Dict[str, Any]]:
-    """Get a list of all automations from Home Assistant"""
-    # Reuse the get_entities function with domain filtering
-    automation_entities = await get_entities(domain="automation")
-    
-    # Check if we got an error response
-    if isinstance(automation_entities, dict) and "error" in automation_entities:
-        return automation_entities  # Just pass through the error
-    
-    # Process automation entities
-    result = []
-    try:
-        for entity in automation_entities:
-            # Extract relevant information
-            automation_info = {
-                "id": entity["entity_id"].split(".")[1],
-                "entity_id": entity["entity_id"],
-                "state": entity["state"],
-                "alias": entity["attributes"].get("friendly_name", entity["entity_id"]),
-            }
-            
-            # Add any additional attributes that might be useful
-            if "last_triggered" in entity["attributes"]:
-                automation_info["last_triggered"] = entity["attributes"]["last_triggered"]
-            
-            result.append(automation_info)
-    except (TypeError, KeyError) as e:
-        # Handle errors in processing the entities
-        return {"error": f"Error processing automation entities: {str(e)}"}
-        
-    return result
-
-@handle_api_errors
-async def reload_automations() -> Dict[str, Any]:
-    """Reload all automations in Home Assistant"""
-    return await call_service("automation", "reload", {})
-
-@handle_api_errors
-async def restart_home_assistant() -> Dict[str, Any]:
-    """Restart Home Assistant"""
-    return await call_service("homeassistant", "restart", {})
-
-@handle_api_errors
-async def get_hass_error_log() -> Dict[str, Any]:
+async def get_hass_error_log(hours: float = 24.0) -> Dict[str, Any]:
     """
-    Get the Home Assistant error log for troubleshooting
-    
+    Get the Home Assistant error log for troubleshooting.
+    If the /api/error_log endpoint is missing (404), fallback to Logbook.
+
+    Args:
+        hours: Number of hours to look back (default: 24).
+
     Returns:
-        A dictionary containing:
-        - log_text: The full error log text
-        - error_count: Number of ERROR entries found
-        - warning_count: Number of WARNING entries found
-        - integration_mentions: Map of integration names to mention counts
-        - error: Error message if retrieval failed
+        A dictionary containing log text, counts, and integration mentions.
     """
     try:
         # Call the Home Assistant API error_log endpoint
         url = f"{HA_URL}/api/error_log"
         headers = get_ha_headers()
-        
+
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=headers, timeout=30)
             
+            # Handle 404 by falling back to logbook
+            if response.status_code == 404:
+                return await _get_error_log_from_logbook(hours)
+
             if response.status_code == 200:
-                log_text = response.text
+                full_log_text = response.text
                 
+                # Filter log content by hours
+                from datetime import datetime, timedelta
+                import re
+                
+                cutoff_time = datetime.now() - timedelta(hours=hours)
+                filtered_lines = []
+                
+                # Simple regex for timestamp: 2024-01-01 12:00:00
+                timestamp_pattern = re.compile(r'^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})')
+                
+                is_keeping = False
+                for line in full_log_text.splitlines():
+                    match = timestamp_pattern.match(line)
+                    if match:
+                        try:
+                            log_time = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S")
+                            if log_time >= cutoff_time:
+                                is_keeping = True
+                            else:
+                                is_keeping = False
+                        except ValueError:
+                            pass # Keep line if we are currently keeping (multiline)
+                    
+                    if is_keeping:
+                        filtered_lines.append(line)
+                
+                log_text = "\n".join(filtered_lines) if filtered_lines else ""
+
                 # Count errors and warnings
                 error_count = log_text.count("ERROR")
                 warning_count = log_text.count("WARNING")
-                
+
                 # Extract integration mentions
-                import re
                 integration_mentions = {}
-                
-                # Look for patterns like [mqtt], [zwave], etc.
                 for match in re.finditer(r'\[([a-zA-Z0-9_]+)\]', log_text):
                     integration = match.group(1).lower()
                     if integration not in integration_mentions:
                         integration_mentions[integration] = 0
                     integration_mentions[integration] += 1
-                
+
                 return {
+                    "source": "system_log",
                     "log_text": log_text,
                     "error_count": error_count,
                     "warning_count": warning_count,
@@ -485,6 +469,55 @@ async def get_hass_error_log() -> Dict[str, Any]:
             "error": f"Error retrieving error log: {str(e)}",
             "log_text": "",
             "error_count": 0,
+            "warning_count": 0,
+            "integration_mentions": {}
+        }
+
+async def _get_error_log_from_logbook(hours: float) -> Dict[str, Any]:
+    """Fallback to searching Logbook for errors if API is missing."""
+    try:
+        from datetime import datetime, timedelta
+        
+        start_time = (datetime.now() - timedelta(hours=hours)).isoformat()
+        
+        # We need to call get_logbook. Since it's async and in the same module, 
+        # we can just call it if we ensure it's defined or use a forward ref wrapper if needed.
+        # But wait, get_logbook is defined below. 
+        # Functions are runtime resolved, so as long as get_logbook exists when called, it's fine.
+        
+        logbook_entries = await get_logbook(start_time=start_time)
+        
+        # Filter for "error" or "warning" case-insensitive
+        error_entries = []
+        for entry in logbook_entries:
+            text_repr = str(entry).lower()
+            if "error" in text_repr or "warn" in text_repr:
+                error_entries.append(entry)
+                
+        # Format as text
+        log_lines = []
+        for entry in error_entries:
+            when = entry.get("when", "")
+            name = entry.get("name", "Unknown")
+            msg = entry.get("message", "")
+            state = entry.get("state", "")
+            log_lines.append(f"{when} [{name}] {state} {msg}".strip())
+            
+        log_text = "\n".join(log_lines)
+        
+        return {
+            "source": "logbook_fallback",
+            "message": "Note: /api/error_log returned 404. Falling back to Logbook events.",
+            "log_text": log_text,
+            "error_count": len(error_entries),
+            "warning_count": 0, # Hard to distinguish without parsing
+            "integration_mentions": {}
+        }
+    except Exception as e:
+        return {
+            "error": f"Fallback to logbook failed: {str(e)}",
+            "log_text": "",
+            "error_count": 0, 
             "warning_count": 0,
             "integration_mentions": {}
         }
@@ -650,3 +683,36 @@ async def get_system_overview() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error generating system overview: {str(e)}")
         return {"error": f"Error generating system overview: {str(e)}"}
+
+@handle_api_errors
+async def get_logbook(
+    start_time: str, 
+    end_time: Optional[str] = None, 
+    entity_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Get logbook entries from Home Assistant.
+    
+    Args:
+        start_time: Start time for the logbook period (ISO 8601 string).
+        end_time: Optional end time for the logbook period (ISO 8601 string).
+        entity_id: Optional entity ID to filter by.
+        
+    Returns:
+        List of logbook entries.
+    """
+    client = await get_client()
+    
+    # URL is /api/logbook/<timestamp>
+    url = f"{HA_URL}/api/logbook/{start_time}"
+    
+    params = {}
+    if end_time:
+        params["end_time"] = end_time
+    if entity_id:
+        params["entity"] = entity_id
+        
+    response = await client.get(url, headers=get_ha_headers(), params=params)
+    response.raise_for_status()
+    
+    return response.json()

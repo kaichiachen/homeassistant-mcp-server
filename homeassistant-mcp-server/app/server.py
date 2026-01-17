@@ -14,18 +14,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from app.hass import (
+from app.client import (
     get_hass_version, get_entity_state, call_service, get_entities,
-    get_automations, restart_home_assistant, 
     cleanup_client, filter_fields, summarize_domain, get_system_overview,
-    get_hass_error_log, get_entity_history
+    get_hass_error_log, get_entity_history, get_logbook as get_logbook_impl
 )
+from app.domains.automation import get_automations, reload_automations
+from app.domains.automation import get_automations, reload_automations
+from app.domains.homeassistant import restart_home_assistant
+from app.domains.calendar import get_calendar_events
+from app.domains.script import get_script_config, get_scripts
+from datetime import datetime, timedelta
+import asyncio
 
 # Type variable for generic functions
 from fastapi import FastAPI
 from fastmcp import FastMCP
 import uvicorn
-mcp = FastMCP("ha-mcp-server")
+mcp = FastMCP("homeassistant-mcp-server")
 
 # Get the MCP HTTP app and its lifespan
 mcp_app = mcp.http_app(path="/", stateless_http=True)
@@ -39,7 +45,7 @@ app.mount("/mcp", mcp_app)
 # Add health check
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "ha-mcp-server"}
+    return {"status": "ok", "service": "homeassistant-mcp-server"}
 
 @mcp.tool()
 async def get_version() -> str:
@@ -117,7 +123,8 @@ async def entity_action(entity_id: str, action: str, params_json: str = "{}") ->
     data = {"entity_id": entity_id, **(params or {})}
     
     logger.info(f"Performing action '{action}' on entity: {entity_id} with params: {params}")
-    return await call_service(domain, service, data)
+    result = await call_service(domain, service, data)
+    return {"result": result}
 
 @mcp.resource("hass://entities/{entity_id}")
 async def get_entity_resource(entity_id: str) -> str:
@@ -640,7 +647,68 @@ async def system_overview() -> Dict[str, Any]:
         - After getting an overview, use domain_summary_tool to dig deeper into specific domains
     """
     logger.info("Generating complete system overview")
+    logger.info("Generating complete system overview")
     return await get_system_overview()
+
+@mcp.tool()
+async def get_calendar_events_tool(
+    entity_id: Optional[str] = None, 
+    start_offset_days: int = 0, 
+    days_count: int = 3
+) -> Dict[str, Any]:
+    """
+    Get calendar events for a date range.
+    
+    Args:
+        entity_id: Optional specific calendar entity ID. If not provided, all calendars are checked.
+        start_offset_days: Start day offset from today (0 = today, 1 = tomorrow).
+        days_count: Number of days to fetch events for (default: 3).
+        
+    Returns:
+        Dictionary mapping calendar entity IDs to their list of events.
+    """
+    logger.info(f"Getting calendar events (entity: {entity_id}, offset: {start_offset_days}, days: {days_count})")
+    
+    # Calculate date range snapping to midnight
+    now = datetime.now()
+    today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    start_date = today_midnight + timedelta(days=start_offset_days)
+    end_date = start_date + timedelta(days=days_count)
+    
+    # If entity_id is provided, fetch just that one
+    if entity_id:
+        try:
+            events = await get_calendar_events(entity_id, start_date, end_date)
+            return {entity_id: events}
+        except Exception as e:
+            return {"error": f"Failed to fetch events for {entity_id}: {str(e)}"}
+            
+    # If no entity_id, find all calendars first
+    calendars = await get_entities(domain="calendar", lean=True)
+    if isinstance(calendars, dict) and "error" in calendars:
+        return {"error": calendars["error"]}
+        
+    results = {}
+    
+    # Create tasks for all calendars
+    tasks = []
+    calendar_ids = [c["entity_id"] for c in calendars]
+    
+    for cal_id in calendar_ids:
+        tasks.append(get_calendar_events(cal_id, start_date, end_date))
+        
+    # Execute in parallel
+    events_list = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Process results
+    for cal_id, events in zip(calendar_ids, events_list):
+        if isinstance(events, Exception):
+            results[cal_id] = {"error": str(events)}
+        else:
+            results[cal_id] = events
+            
+    return results
 
 @mcp.resource("hass://entities/{entity_id}/detailed")
 async def get_entity_resource_detailed(entity_id: str) -> str:
@@ -848,7 +916,64 @@ async def list_automations() -> List[Dict[str, Any]]:
 
 # We already have a list_automations tool, so no need to duplicate functionality
 
+# Script management MCP tools
 @mcp.tool()
+async def list_scripts_tool(include_config: bool = False) -> List[Dict[str, Any]]:
+    """
+    Get a list of all scripts from Home Assistant.
+    
+    Args:
+        include_config: If True, includes the full configuration (fields, sequence) for each script.
+    
+    Returns:
+        List of scripts with their IDs, names, states, and optionally full configuration.
+        
+    Examples:
+        Returns all script objects with state and friendly names
+        include_config=True - includes full configuration with fields and sequence
+    """
+    logger.info(f"Getting all scripts (include_config={include_config})")
+    try:
+        scripts = await get_scripts(include_config=include_config)
+        
+        if isinstance(scripts, dict) and "error" in scripts:
+            logger.warning(f"Error getting scripts: {scripts['error']}")
+            return []
+            
+        return scripts
+    except Exception as e:
+        logger.error(f"Error in list_scripts_tool: {str(e)}")
+        return []
+
+@mcp.tool()
+async def get_script_config_tool(script_id: str) -> Dict[str, Any]:
+    """
+    Get the configuration of a Home Assistant script including its fields (input parameters) and sequence (actions).
+    
+    Args:
+        script_id: The script ID (with or without 'script.' prefix, e.g., 'homepod_edge_tts')
+    
+    Returns:
+        Script configuration including:
+        - alias: Friendly name of the script
+        - mode: Execution mode (single, queued, restart, parallel)
+        - fields: Input parameters the script accepts (name, description, selector, etc.)
+        - sequence: List of actions the script performs
+        - icon: Script icon (if set)
+        
+    Examples:
+        script_id="homepod_edge_tts" - get the HomePod TTS script configuration
+        script_id="script.notify_everyone" - also accepts full entity ID
+    """
+    logger.info(f"Getting script config for: {script_id}")
+    try:
+        config = await get_script_config(script_id)
+        return config
+    except Exception as e:
+        logger.error(f"Error in get_script_config_tool: {str(e)}")
+        return {"error": f"Failed to get script config: {str(e)}"}
+
+
 async def restart_ha() -> Dict[str, Any]:
     """
     Restart Home Assistant
@@ -889,7 +1014,15 @@ async def call_service_tool(domain: str, service: str, data_json: str = "{}") ->
         return {"error": f"Invalid JSON in data_json: {data_json}"}
 
     logger.info(f"Calling Home Assistant service: {domain}.{service} with data: {data}")
-    return await call_service(domain, service, data or {})
+    result = await call_service(domain, service, data or {})
+    
+    # Ensure the result is always a dict (HA can return a list for some services)
+    if isinstance(result, list):
+        return {"result": result, "success": True}
+    elif isinstance(result, dict):
+        return result
+    else:
+        return {"result": result, "success": True}
 
 # Prompt functionality
 @mcp.prompt()
@@ -1193,9 +1326,12 @@ async def get_history(entity_id: str, hours: int = 24) -> Dict[str, Any]:
         }
 
 @mcp.tool()
-async def get_error_log() -> Dict[str, Any]:
+async def get_error_log(hours: float = 24.0) -> Dict[str, Any]:
     """
-    Get the Home Assistant error log for troubleshooting
+    Get the Home Assistant error log for troubleshooting.
+    
+    Args:
+        hours: Number of hours to look back (default: 24).
     
     Returns:
         A dictionary containing:
@@ -1213,8 +1349,34 @@ async def get_error_log() -> Dict[str, Any]:
         - Pay attention to timestamps to correlate errors with events
         - Focus on integrations with many mentions in the log    
     """
-    logger.info("Getting Home Assistant error log")
-    return await get_hass_error_log()
+    logger.info(f"Getting Home Assistant error log (hours={hours})")
+    return await get_hass_error_log(hours=hours)
+
+@mcp.tool()
+async def get_logbook(
+    hours: float = 24.0, 
+    entity_id: Optional[str] = None,
+    end_time: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Get logbook entries from Home Assistant
+    
+    Args:
+        hours: Number of hours to look back (default: 24).
+        entity_id: Optional entity ID to filter by.
+        end_time: Optional end time (ISO 8601 string) for the logbook period.
+        
+    Returns:
+        A list of logbook entries.
+    """
+    logger.info(f"Getting logbook (hours={hours}, entity={entity_id})")
+    
+    # Calculate start time
+    # We use local time as base since HA usually handles it well, or UTC if preferred
+    start_time_dt = datetime.now() - timedelta(hours=hours)
+    start_time = start_time_dt.isoformat()
+    
+    return await get_logbook_impl(start_time=start_time, end_time=end_time, entity_id=entity_id)
 if __name__ == "__main__":
 
     # Run the server

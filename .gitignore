@@ -33,3 +33,13 @@ htmlcov/
 .vscode/
 .idea/
 *.iml
+
+# Logs
+*.log
+server.log
+
+# Generated files
+tools_list.json
+
+# Lock files (optional - uncomment if you want to track)
+# uv.lock

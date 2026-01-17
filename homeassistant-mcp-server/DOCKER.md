@@ -2,7 +2,7 @@
 
 ## Build
 ```bash
-docker build -t ha-mcp-server .
+docker build -t homeassistant-mcp-server .
 ```
 
 ## Run
@@ -13,8 +13,8 @@ docker run -d \
   -p 8000:8000 \
   -e HA_URL="http://host.docker.internal:8123" \
   -e HA_TOKEN="your_long_lived_access_token" \
-  --name ha-mcp-server \
-  ha-mcp-server
+  --name homeassistant-mcp-server \
+  homeassistant-mcp-server
 ```
 
 > **Note**: If your Home Assistant is running on localhost, use `host.docker.internal` (Mac/Windows) or `--network host` (Linux) to allow the container to access it.
@@ -22,7 +22,7 @@ docker run -d \
 ## Verify
 Check the logs:
 ```bash
-docker logs -f ha-mcp-server
+docker logs -f homeassistant-mcp-server
 ```
 
 Test the connection:

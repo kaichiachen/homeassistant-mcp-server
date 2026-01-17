@@ -3,7 +3,7 @@
 from . import (
     light, switch, binary_sensor, sensor, climate, 
     media_player, cover, fan, camera, automation, 
-    scene, script
+    scene, script, calendar
 )
 
 # Registry of all domain modules
@@ -20,6 +20,7 @@ _DOMAINS = {
     "automation": automation,
     "scene": scene,
     "script": script,
+    "calendar": calendar,
 }
 
 # Aggregate important attributes

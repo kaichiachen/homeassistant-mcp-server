@@ -1,85 +1,167 @@
-# ha-mcp-server
+# homeassistant-mcp-server
 
-A Model Context Protocol (MCP) server for Home Assistant, utilizing Streamable HTTP for real-time communication. This allows you to expose your Home Assistant entities and services to MCP clients (like Claude Desktop or other AI agents).
+[![Add Repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fkaichiachen%2Fhomeassistant-mcp-server)
+
+A Model Context Protocol (MCP) server for Home Assistant, utilizing Streamable HTTP for real-time communication. This allows you to expose your Home Assistant entities and services to MCP clients (like Claude Desktop, Cursor, Antigravity, and other AI agents).
 
 ## Features
 
-- **Entity Listing**: List and filter Home Assistant entities (e.g., lights, switches, sensors).
-- **Control**: Turn devices on/off and control other services.
-- **Real-time**: Built on `mcp` library with Streamable HTTP transport.
-- **Multi-Arch**: Supports `amd64` and `aarch64` (ARM64), making it perfect for Raspberry Pi.
+- **Entity Management**: List, search, and filter Home Assistant entities by domain
+- **Device Control**: Turn devices on/off, toggle, and control entity actions
+- **Automation & Scripts**: List automations, get script configurations including input fields
+- **Calendar Events**: Query calendar events for date ranges
+- **System Monitoring**: Get system overview, error logs, entity history, and logbook
+- **Service Calls**: Call any Home Assistant service with custom parameters
+- **Multi-Arch**: Supports `amd64` and `aarch64` (ARM64), perfect for Raspberry Pi
+
+## Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_version` | Get Home Assistant version |
+| `get_entity` | Get entity state with optional field filtering |
+| `entity_action` | Perform on/off/toggle actions on entities |
+| `list_entities` | List entities with domain filtering and search |
+| `search_entities_tool` | Search entities by name, ID, or attributes |
+| `domain_summary_tool` | Get summary of entities in a specific domain |
+| `system_overview` | Get comprehensive overview of the HA system |
+| `list_automations` | List all automations with state and triggers |
+| `list_scripts_tool` | List all scripts with optional configuration |
+| `get_script_config_tool` | Get script fields (inputs) and sequence (actions) |
+| `get_calendar_events_tool` | Get calendar events for a date range |
+| `call_service_tool` | Call any Home Assistant service |
+| `get_history` | Get entity state change history |
+| `get_error_log` | Get Home Assistant error log |
+| `get_logbook` | Get logbook entries |
 
 ## Installation
 
-### Method 1: Home Assistant Add-on
+### Method 1: Home Assistant Add-on (Recommended)
 
-1.  **Add Repository**:
-    - Go to **Settings** > **Add-ons** > **Add-on Store**.
-    - Click the three dots (top right) > **Repositories**.
-    - Add the URL of this repository: `https://github.com/kaichiachen/ha-mcp-server`.
-2.  **Install**:
-    - Find "ha-mcp-server" in the list and click **Install**.
-3.  **Configure**:
-    - Go to the **Configuration** tab of the add-on.
-    - Set `ha_url` (e.g., `http://homeassistant.local:8123` for internal access or your external URL).
-    - Set `ha_token` (Long-Lived Access Token created in your Profile).
-4.  **Start**:
-    - Click **Start**. Check the "Log" tab to ensure it's running on port 8000.
+Click the button below to add the repository:
 
-### Method 2: Docker (Remote Server)
+[![Add Repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fkaichiachen%2Fhomeassistant-mcp-server)
 
-To deploy on a remote server (e.g., a VPS or another Raspberry Pi):
+Or manually:
 
-**Using Docker Run:**
+1. Go to **Settings** > **Add-ons** > **Add-on Store**
+2. Click ⋮ (top right) > **Repositories**
+3. Add: `https://github.com/kaichiachen/homeassistant-mcp-server`
+4. Find "homeassistant-mcp-server" and click **Install**
+5. Configure `ha_url` and `ha_token` in the **Configuration** tab
+6. Click **Start**
+
+### Method 2: Docker
 
 ```bash
 docker run -d \
-  --name ha-mcp-server \
+  --name homeassistant-mcp-server \
   -p 8000:8000 \
   -e HA_URL="http://your-home-assistant-ip:8123" \
   -e HA_TOKEN="your-long-lived-access-token" \
-  ghcr.io/kaichiachen/ha-mcp-server:latest
-```
-
-**Using Docker Compose:**
-
-```yaml
-services:
-  ha-mcp-server:
-    image: ghcr.io/kaichiachen/ha-mcp-server:latest
-    container_name: ha-mcp-server
-    ports:
-      - "8000:8000"
-    environment:
-      - HA_URL=http://your-home-assistant-ip:8123
-      - HA_TOKEN=your-long-lived-access-token
-    restart: unless-stopped
+  ghcr.io/kaichiachen/homeassistant-mcp-server:latest
 ```
 
 ## Configuration
 
-| Environment Variable | Add-on Option | Description | Default |
-|----------------------|---------------|-------------|---------|
-| `HA_URL`             | `ha_url`      | URL of Home Assistant instance | `http://localhost:8123` |
-| `HA_TOKEN`           | `ha_token`    | Long Lived Access Token | _Required_ |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `HA_URL` | Home Assistant URL | `http://localhost:8123` |
+| `HA_TOKEN` | Long-Lived Access Token | _Required_ |
+
+## MCP Client Configuration
+
+Once your server is running (e.g., at `http://localhost:8000`), configure your MCP client:
+
+### Cursor
+
+Add to `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "ha-mcp-server": {
+      "url": "http://localhost:8000/mcp/"
+    }
+  }
+}
+```
+
+### Antigravity
+
+Add to `~/.gemini/antigravity/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "ha-mcp-server": {
+      "url": "http://localhost:8000/mcp/"
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "ha-mcp-server": {
+      "url": "http://localhost:8000/mcp/"
+    }
+  }
+}
+```
+
+### Gemini CLI
+
+```bash
+gemini --mcp-server="http://localhost:8000/mcp/"
+```
+
+Or add to `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "ha-mcp-server": {
+      "url": "http://localhost:8000/mcp/"
+    }
+  }
+}
+```
+
+### Claude Code (VS Code Extension)
+
+Add to VS Code settings (`settings.json`):
+
+```json
+{
+  "claude.mcpServers": {
+    "ha-mcp-server": {
+      "url": "http://localhost:8000/mcp/"
+    }
+  }
+}
+```
 
 ## Development
 
-1.  **Install `uv`**:
-    ```bash
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    ```
-2.  **Run Locally**:
-    ```bash
-    export HA_URL="http://localhost:8123"
-    export HA_TOKEN="your-token"
-    uv run python -m app.server
-    # The server will be available at http://localhost:8000/mcp/
-    # Health check: http://localhost:8000/health
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-    # Verify connectivity (requires Accept header for stateless mode):
-    curl -v -H "Accept: application/json, text/event-stream" \
-         -H "Content-Type: application/json" \
-         -d '{"jsonrpc": "2.0", "method": "initialize", "id": 1, "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}}' \
-         http://localhost:8000/mcp/
-    ```
+# Run locally
+export HA_URL="http://localhost:8123"
+export HA_TOKEN="your-token"
+uv run python -m app.server
+
+# Server available at http://localhost:8000/mcp/
+# Health check: http://localhost:8000/health
+```
+
+## License
+
+MIT License - See [LICENSE](LICENSE) file.
