@@ -23,6 +23,7 @@ MCP (Model Context Protocol) server that connects AI assistants to your Home Ass
 | `list_scripts_tool` | List scripts |
 | `get_script_config_tool` | Get script inputs and actions |
 | `get_calendar_events_tool` | Query calendar events |
+| `get_camera_image_tool` | Get a still image from a camera |
 | `call_service_tool` | Call any HA service |
 | `system_overview` | Get system overview |
 | `get_history` | Get entity history |

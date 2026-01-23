@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 from app.client import (
     get_hass_version, get_entity_state, call_service, get_entities,
     cleanup_client, filter_fields, summarize_domain, get_system_overview,
-    get_hass_error_log, get_entity_history, get_logbook as get_logbook_impl
+    get_hass_error_log, get_entity_history, get_logbook as get_logbook_impl,
+    get_camera_image
 )
 from app.domains.automation import get_automations, reload_automations
 from app.domains.automation import get_automations, reload_automations
@@ -628,6 +629,49 @@ async def domain_summary_tool(domain: str, example_limit: int = 3) -> Dict[str, 
         - Use this before retrieving all entities in a domain to understand what's available    """
     logger.info(f"Getting domain summary for: {domain}")
     return await summarize_domain(domain, example_limit)
+
+@mcp.tool()
+async def get_camera_image_tool(entity_id: str) -> Dict[str, Any]:
+    """
+    Get a still image from a Home Assistant camera entity.
+    
+    Args:
+        entity_id: The camera entity ID (e.g., 'camera.front_door'). Ensure all strings are UTF-8 encoded.
+        
+    Returns:
+        A dictionary containing the base64 encoded image and content type.
+    """
+    import base64
+    logger.info(f"Fetching image for camera: {entity_id}")
+    
+    # Check if the entity is actually a camera
+    if not entity_id.startswith("camera."):
+        return {"error": f"Entity {entity_id} is not a camera"}
+        
+    result = await get_camera_image(entity_id)
+    
+    # Check for error in the result (from handle_api_errors)
+    if isinstance(result, dict) and "error" in result:
+        return result
+        
+    # Result should be a dict with 'content' (bytes) and 'content_type' (str)
+    try:
+        image_bytes = result.get("content")
+        content_type = result.get("content_type", "image/jpeg")
+        
+        if not image_bytes:
+            return {"error": f"No image data received for {entity_id}"}
+            
+        encoded_image = base64.b64encode(image_bytes).decode('utf-8')
+        
+        return {
+            "entity_id": entity_id,
+            "image_b64": encoded_image,
+            "content_type": content_type
+        }
+    except Exception as e:
+        logger.error(f"Error encoding camera image: {str(e)}")
+        return {"error": f"Error encoding camera image: {str(e)}"}
 
 @mcp.tool()
 async def system_overview() -> Dict[str, Any]:

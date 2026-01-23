@@ -315,6 +315,29 @@ async def call_service(domain: str, service: str, data: Optional[Dict[str, Any]]
     return response.json()
 
 @handle_api_errors
+async def get_camera_image(entity_id: str) -> Dict[str, Any]:
+    """
+    Fetch the current image from a camera entity
+    
+    Args:
+        entity_id: The camera entity ID
+        
+    Returns:
+        A dictionary containing the image bytes and content type
+    """
+    client = await get_client()
+    response = await client.get(
+        f"{HA_URL}/api/camera_proxy/{entity_id}", 
+        headers=get_ha_headers()
+    )
+    response.raise_for_status()
+    
+    return {
+        "content": response.content,
+        "content_type": response.headers.get("Content-Type", "image/jpeg")
+    }
+
+@handle_api_errors
 async def summarize_domain(domain: str, example_limit: int = 3) -> Dict[str, Any]:
     """
     Generate a summary of entities in a domain

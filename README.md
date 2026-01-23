@@ -29,6 +29,7 @@ A Model Context Protocol (MCP) server for Home Assistant, utilizing Streamable H
 | `list_scripts_tool` | List all scripts with optional configuration |
 | `get_script_config_tool` | Get script fields (inputs) and sequence (actions) |
 | `get_calendar_events_tool` | Get calendar events for a date range |
+| `get_camera_image_tool` | Get a still image from a camera |
 | `call_service_tool` | Call any Home Assistant service |
 | `get_history` | Get entity state change history |
 | `get_error_log` | Get Home Assistant error log |
