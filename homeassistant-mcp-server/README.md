@@ -48,4 +48,9 @@ MCP (Model Context Protocol) server that connects AI assistants to your Home Ass
 gemini --mcp-server="http://your-ha-ip:8000/mcp/"
 ```
 
+## Best Practices
+
+- **Unicode Encoding**: Ensure all input strings are UTF-8 encoded.
+- **Token Efficiency**: Use domain summaries and filtered searches instead of listing all entities in large installations.
+
 See the [main README](../README.md) for detailed configuration instructions.

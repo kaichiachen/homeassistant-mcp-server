@@ -64,8 +64,8 @@ async def get_entity(entity_id: str, fields: Optional[List[str]] = None, detaile
     Get the state of a Home Assistant entity with optional field filtering
     
     Args:
-        entity_id: The entity ID to get (e.g. 'light.living_room')
-        fields: Optional list of fields to include (e.g. ['state', 'attr.brightness'])
+        entity_id: The entity ID to get (e.g. 'light.living_room'). Ensure all strings are UTF-8 encoded.
+        fields: Optional list of fields to include (e.g. ['state', 'attr.brightness']). Ensure all strings are UTF-8 encoded.
         detailed: If True, returns all entity fields without filtering
                 
     Examples:
@@ -90,9 +90,9 @@ async def entity_action(entity_id: str, action: str, params_json: Any = "{}") ->
     Perform an action on a Home Assistant entity (on, off, toggle)
     
     Args:
-        entity_id: The entity ID to control (e.g. 'light.living_room')
-        action: The action to perform ('on', 'off', 'toggle')
-        params_json: Optional JSON string or dictionary of additional parameters for the service call (e.g. '{"brightness": 255}')
+        entity_id: The entity ID to control (e.g. 'light.living_room'). Ensure all strings are UTF-8 encoded.
+        action: The action to perform ('on', 'off', 'toggle'). Ensure all strings are UTF-8 encoded.
+        params_json: Optional JSON string or dictionary of additional parameters for the service call (e.g. '{"brightness": 255}'). Ensure all strings are UTF-8 encoded.
     
     Returns:
         The response from Home Assistant
@@ -242,11 +242,11 @@ async def list_entities(
     Get a list of Home Assistant entities with optional filtering
     
     Args:
-        domain: Optional domain to filter by (e.g., 'light', 'switch', 'sensor')
-        search_query: Optional search term to filter entities by name, id, or attributes
+        domain: Optional domain to filter by (e.g., 'light', 'switch', 'sensor'). Ensure all strings are UTF-8 encoded.
+        search_query: Optional search term to filter entities by name, id, or attributes. Ensure all strings are UTF-8 encoded.
                      (Note: Does not support wildcards. To get all entities, leave this empty)
         limit: Maximum number of entities to return (default: 100)
-        fields: Optional list of specific fields to include in each entity
+        fields: Optional list of specific fields to include in each entity. Ensure all strings are UTF-8 encoded.
         detailed: If True, returns all entity fields without filtering
     
     Returns:
@@ -365,7 +365,7 @@ async def search_entities_tool(query: str, limit: int = 20) -> Dict[str, Any]:
     Search for entities matching a query string
     
     Args:
-        query: The search query to match against entity IDs, names, and attributes.
+        query: The search query to match against entity IDs, names, and attributes. Ensure all strings are UTF-8 encoded.
               (Note: Does not support wildcards. To get all entities, leave this blank or use list_entities tool)
         limit: Maximum number of results to return (default: 20)
     
@@ -611,7 +611,7 @@ async def domain_summary_tool(domain: str, example_limit: int = 3) -> Dict[str, 
     Get a summary of entities in a specific domain
     
     Args:
-        domain: The domain to summarize (e.g., 'light', 'switch', 'sensor')
+        domain: The domain to summarize (e.g., 'light', 'switch', 'sensor'). Ensure all strings are UTF-8 encoded.
         example_limit: Maximum number of examples to include for each state
     
     Returns:
@@ -663,7 +663,7 @@ async def get_calendar_events_tool(
     Get calendar events for a date range.
     
     Args:
-        entity_id: Optional specific calendar entity ID. If not provided, all calendars are checked.
+        entity_id: Optional specific calendar entity ID. If not provided, all calendars are checked. Ensure all strings are UTF-8 encoded.
         start_offset_days: Start day offset from today (0 = today, 1 = tomorrow).
         days_count: Number of days to fetch events for (default: 3).
         
@@ -954,7 +954,7 @@ async def get_script_config_tool(script_id: str) -> Dict[str, Any]:
     Get the configuration of a Home Assistant script including its fields (input parameters) and sequence (actions).
     
     Args:
-        script_id: The script ID (with or without 'script.' prefix, e.g., 'homepod_edge_tts')
+        script_id: The script ID (with or without 'script.' prefix, e.g., 'homepod_edge_tts'). Ensure all strings are UTF-8 encoded.
     
     Returns:
         Script configuration including:
@@ -995,9 +995,9 @@ async def call_service_tool(domain: str, service: str, data_json: Any = "{}") ->
     Call any Home Assistant service (low-level API access)
     
     Args:
-        domain: The domain of the service (e.g., 'light', 'switch', 'automation')
-        service: The service to call (e.g., 'turn_on', 'turn_off', 'toggle')
-        data_json: Optional JSON string or dictionary of data to pass to the service (e.g., '{"entity_id": "light.living_room"}')
+        domain: The domain of the service (e.g., 'light', 'switch', 'automation'). Ensure all strings are UTF-8 encoded.
+        service: The service to call (e.g., 'turn_on', 'turn_off', 'toggle'). Ensure all strings are UTF-8 encoded.
+        data_json: Optional JSON string or dictionary of data to pass to the service (e.g., '{"entity_id": "light.living_room"}'). Ensure all strings are UTF-8 encoded.
     
     Returns:
         The response from Home Assistant (usually empty for successful calls)
@@ -1040,8 +1040,8 @@ def create_automation(trigger_type: str, entity_id: str = None):
     a new automation in Home Assistant based on the specified trigger type.
     
     Args:
-        trigger_type: The type of trigger for the automation (state, time, etc.)
-        entity_id: Optional entity to use as the trigger source
+        trigger_type: The type of trigger for the automation (state, time, etc.). Ensure all strings are UTF-8 encoded.
+        entity_id: Optional entity to use as the trigger source. Ensure all strings are UTF-8 encoded.
     
     Returns:
         A list of messages for the interactive conversation
@@ -1086,7 +1086,7 @@ def debug_automation(automation_id: str):
     issues with an existing Home Assistant automation.
     
     Args:
-        automation_id: The entity ID of the automation to troubleshoot
+        automation_id: The entity ID of the automation to troubleshoot. Ensure all strings are UTF-8 encoded.
     
     Returns:
         A list of messages for the interactive conversation
@@ -1115,7 +1115,7 @@ def troubleshoot_entity(entity_id: str):
     Home Assistant entity that isn't functioning correctly.
     
     Args:
-        entity_id: The entity ID having issues
+        entity_id: The entity ID having issues. Ensure all strings are UTF-8 encoded.
     
     Returns:
         A list of messages for the interactive conversation

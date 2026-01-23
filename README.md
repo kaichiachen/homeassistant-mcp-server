@@ -162,6 +162,12 @@ uv run python -m app.server
 # Health check: http://localhost:8000/health
 ```
 
+## Best Practices
+
+- **Unicode Encoding**: Ensure all input strings (entity IDs, search queries, service names, etc.) are UTF-8 encoded to ensure compatibility with Home Assistant.
+- **Lean Format**: Use the default lean format for entity retrieval unless you specifically need all attributes, to save on token usage.
+- **Domain Filtering**: Prefer filtering by domain when listing entities to improve performance and reduce response size.
+
 ## License
 
 MIT License - See [LICENSE](LICENSE) file.
