@@ -1,5 +1,5 @@
 name: "homeassistant-mcp-server"
-version: "0.2.0"
+version: "0.2.1"
 slug: "homeassistant_mcp_server"
 description: "Model Context Protocol (MCP) server for Home Assistant."
 url: "https://github.com/kaichiachen/homeassistant-mcp-server"

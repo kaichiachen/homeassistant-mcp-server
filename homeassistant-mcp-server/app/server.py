@@ -85,14 +85,14 @@ async def get_entity(entity_id: str, fields: Optional[List[str]] = None, detaile
         return await get_entity_state(entity_id, lean=True)
 
 @mcp.tool()
-async def entity_action(entity_id: str, action: str, params_json: str = "{}") -> dict:
+async def entity_action(entity_id: str, action: str, params_json: Any = "{}") -> dict:
     """
     Perform an action on a Home Assistant entity (on, off, toggle)
     
     Args:
         entity_id: The entity ID to control (e.g. 'light.living_room')
         action: The action to perform ('on', 'off', 'toggle')
-        params_json: Optional JSON string of additional parameters for the service call (e.g. '{"brightness": 255}')
+        params_json: Optional JSON string or dictionary of additional parameters for the service call (e.g. '{"brightness": 255}')
     
     Returns:
         The response from Home Assistant
@@ -106,12 +106,15 @@ async def entity_action(entity_id: str, action: str, params_json: str = "{}") ->
         return {"error": f"Invalid action: {action}. Valid actions are 'on', 'off', 'toggle'"}
     
     try:
-        if params_json:
+        if isinstance(params_json, dict):
+            params = params_json
+        elif isinstance(params_json, str) and params_json:
             params = json.loads(params_json)
         else:
             params = {}
     except json.JSONDecodeError:
         return {"error": f"Invalid JSON in params_json: {params_json}"}
+
     
     # Map action to service name
     service = action if action == "toggle" else f"turn_{action}"
@@ -987,14 +990,14 @@ async def restart_ha() -> Dict[str, Any]:
     return await restart_home_assistant()
 
 @mcp.tool()
-async def call_service_tool(domain: str, service: str, data_json: str = "{}") -> Dict[str, Any]:
+async def call_service_tool(domain: str, service: str, data_json: Any = "{}") -> Dict[str, Any]:
     """
     Call any Home Assistant service (low-level API access)
     
     Args:
         domain: The domain of the service (e.g., 'light', 'switch', 'automation')
         service: The service to call (e.g., 'turn_on', 'turn_off', 'toggle')
-        data_json: Optional JSON string of data to pass to the service (e.g., '{"entity_id": "light.living_room"}')
+        data_json: Optional JSON string or dictionary of data to pass to the service (e.g., '{"entity_id": "light.living_room"}')
     
     Returns:
         The response from Home Assistant (usually empty for successful calls)
@@ -1006,7 +1009,9 @@ async def call_service_tool(domain: str, service: str, data_json: str = "{}") ->
     
     """
     try:
-        if data_json:
+        if isinstance(data_json, dict):
+            data = data_json
+        elif isinstance(data_json, str) and data_json:
             data = json.loads(data_json)
         else:
             data = {}
@@ -1014,6 +1019,7 @@ async def call_service_tool(domain: str, service: str, data_json: str = "{}") ->
         return {"error": f"Invalid JSON in data_json: {data_json}"}
 
     logger.info(f"Calling Home Assistant service: {domain}.{service} with data: {data}")
+
     result = await call_service(domain, service, data or {})
     
     # Ensure the result is always a dict (HA can return a list for some services)
